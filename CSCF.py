@@ -231,19 +231,41 @@ class CSCF(nn.Module):
 
         return total_loss
 
-    def train_loop(self, train_dataloader, attrs_multi, similarity_mat, epochs=50):
+    def train_loop(self, train_dataloader, attrs_multi, similarity_mat, epochs=50,
+                   scheduler='none', warmup_epochs=0, min_lr_ratio=0.05, grad_clip=None):
+        if scheduler not in ('none', 'cosine'):
+            raise ValueError('scheduler must be none or cosine')
+        if not 0 <= warmup_epochs < epochs or not 0 <= min_lr_ratio <= 1:
+            raise ValueError('Invalid warmup_epochs or min_lr_ratio')
+        initial_lrs = [group['lr'] for group in self.optim.param_groups]
+        self.training_history = []
         for epoch in range(epochs):
+            if scheduler == 'cosine':
+                if epoch < warmup_epochs:
+                    factor = (epoch + 1) / warmup_epochs
+                else:
+                    progress = (epoch - warmup_epochs) / max(1, epochs - warmup_epochs - 1)
+                    factor = min_lr_ratio + (1 - min_lr_ratio) * (1 + np.cos(np.pi * progress)) / 2
+                for group, initial_lr in zip(self.optim.param_groups, initial_lrs):
+                    group['lr'] = initial_lr * factor
             loss_avg = 0
             for i, batch in enumerate(train_dataloader):
-                target = torch.tensor(batch[1]).to(self.device)
+                target = torch.as_tensor(batch[1], dtype=torch.long, device=self.device)
                 input_multi = [torch.tensor(inputs).to(self.device) for inputs in batch[0]]
                 attr_multi = torch.tensor(attrs_multi).to(self.device)
                 mask = torch.tensor(batch[2]).to(self.device)
                 sim_mat = torch.tensor(similarity_mat).to(self.device)
                 loss = self.train_loss(input_multi, attr_multi, sim_mat, target, mask)
+                if not torch.isfinite(loss):
+                    raise FloatingPointError(f'Non-finite training loss at epoch {epoch + 1}')
                 loss_avg += loss.item()
                 self.optim.zero_grad()
                 loss.backward()
+                if grad_clip is not None:
+                    torch.nn.utils.clip_grad_norm_(self.params_to_update, grad_clip)
                 self.optim.step()
             loss_avg = loss_avg / len(train_dataloader)
+            self.training_history.append({'epoch': epoch + 1, 'loss': loss_avg,
+                                           'lr': self.optim.param_groups[0]['lr'],
+                                           'group_lrs': [group['lr'] for group in self.optim.param_groups]})
             print(f'The loss of epoch {epoch} is {loss_avg}.')
