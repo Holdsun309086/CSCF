@@ -1,0 +1,16 @@
+{
+  "lr": 0.0001,
+  "batch_size": 1024,
+  "weight_decay": 0.0001,
+  "shuffle": true,
+  "scheduler": "none",
+  "warmup_epochs": 0,
+  "min_lr_ratio": 0.05,
+  "grad_clip": null,
+  "modal_lrs": [
+    0.0008,
+    3e-05
+  ],
+  "modal_weight_decays": null,
+  "drop_last": false
+}
