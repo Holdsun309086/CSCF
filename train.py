@@ -46,7 +46,7 @@ def get_parser(argv=None):
     defaults = dict(lr=None, modal_lrs=None, modal_weight_decays=None, batch_size=2048,
                     shuffle=False, scheduler='none', warmup_epochs=0, min_lr_ratio=0.05,
                     grad_clip=None, weight_decay=0.0001, drop_last=False)
-    config_path = Path(args.config) if args.config else Path(__file__).with_name('sunrgbd_config.json')
+    config_path = Path(args.config) if args.config else Path(__file__).with_name('train_config.json')
     args.training_profile = 'original_defaults'
     args.config_source = None
     if args.config or (args.dataset == 'SUNRGBD' and not args.baseline):
